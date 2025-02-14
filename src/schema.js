@@ -1,8 +1,8 @@
 const { GraphQLObjectType, GraphQLSchema, GraphQLString, GraphQLID, GraphQLFloat, GraphQLList, GraphQLNonNull } = require('graphql');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('./models/User');
-const Employee = require('./models/Employee');
+const User = require('../models/User');
+const Employee = require('../models/Employee');
 require('dotenv').config();
 
 // Define User Type
@@ -94,4 +94,65 @@ const Mutation = new GraphQLObjectType({
                 password: { type: GraphQLNonNull(GraphQLString) }
             },
             async resolve(parent, args) {
-                const hashedPass
+                const hashedPassword = await bcrypt.hash(args.password, 10);
+                const newUser = new User({
+                    username: args.username,
+                    email: args.email,
+                    password: hashedPassword
+                });
+                return await newUser.save();
+            }
+        },
+        addEmployee: {
+            type: EmployeeType,
+            args: {
+                first_name: { type: GraphQLNonNull(GraphQLString) },
+                last_name: { type: GraphQLNonNull(GraphQLString) },
+                email: { type: GraphQLNonNull(GraphQLString) },
+                gender: { type: GraphQLString },
+                designation: { type: GraphQLNonNull(GraphQLString) },
+                salary: { type: GraphQLNonNull(GraphQLFloat) },
+                date_of_joining: { type: GraphQLNonNull(GraphQLString) },
+                department: { type: GraphQLNonNull(GraphQLString) },
+                employee_photo: { type: GraphQLString }
+            },
+            async resolve(parent, args) {
+                const newEmployee = new Employee({
+                    ...args
+                });
+                return await newEmployee.save();
+            }
+        },
+        updateEmployee: {
+            type: EmployeeType,
+            args: {
+                id: { type: GraphQLNonNull(GraphQLID) },
+                first_name: { type: GraphQLString },
+                last_name: { type: GraphQLString },
+                email: { type: GraphQLString },
+                gender: { type: GraphQLString },
+                designation: { type: GraphQLString },
+                salary: { type: GraphQLFloat },
+                date_of_joining: { type: GraphQLString },
+                department: { type: GraphQLString },
+                employee_photo: { type: GraphQLString }
+            },
+            async resolve(parent, args) {
+                return await Employee.findByIdAndUpdate(args.id, args, { new: true });
+            }
+        },
+        deleteEmployee: {
+            type: EmployeeType,
+            args: { id: { type: GraphQLNonNull(GraphQLID) } },
+            async resolve(parent, args) {
+                return await Employee.findByIdAndDelete(args.id);
+            }
+        }
+    }
+});
+
+// Export Schema
+module.exports = new GraphQLSchema({
+    query: RootQuery,
+    mutation: Mutation
+});
