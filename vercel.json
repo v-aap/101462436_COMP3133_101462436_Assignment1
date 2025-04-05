@@ -8,6 +8,14 @@
     ],
     "routes": [
       {
+        "src": "/graphql",
+        "dest": "src/index.js"
+      },
+      {
+        "src": "/uploads/(.*)",
+        "dest": "src/index.js"
+      },
+      {
         "src": "/(.*)",
         "dest": "src/index.js"
       }
