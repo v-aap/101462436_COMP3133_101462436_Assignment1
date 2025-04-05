@@ -3,7 +3,36 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Utility function to save base64 images
+const saveBase64Image = (base64Data, filename) => {
+  // Skip if not a base64 image
+  if (!base64Data || !base64Data.startsWith('data:image')) {
+    return base64Data; // Return as is if not a base64 image
+  }
+
+  // Extract the actual base64 content
+  const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+  
+  if (!matches || matches.length !== 3) {
+    return null;
+  }
+  
+  const buffer = Buffer.from(matches[2], 'base64');
+  const filePath = path.join(uploadsDir, filename);
+  
+  fs.writeFileSync(filePath, buffer);
+  return filename; // Return just the filename to store in the database
+};
 
 // Define User Type
 const UserType = new GraphQLObjectType({
@@ -117,9 +146,20 @@ const Mutation = new GraphQLObjectType({
                 employee_photo: { type: GraphQLString }
             },
             async resolve(parent, args) {
+                let photoPath = args.employee_photo;
+                
+                // If there's a base64 image, save it to a file
+                if (photoPath && photoPath.startsWith('data:image')) {
+                    // Generate a unique filename using employee name and timestamp
+                    const filename = `${args.first_name.toLowerCase()}_${Date.now()}.jpg`;
+                    photoPath = saveBase64Image(photoPath, filename);
+                }
+                
                 const newEmployee = new Employee({
-                    ...args
+                    ...args,
+                    employee_photo: photoPath
                 });
+                
                 return await newEmployee.save();
             }
         },
@@ -138,6 +178,22 @@ const Mutation = new GraphQLObjectType({
                 employee_photo: { type: GraphQLString }
             },
             async resolve(parent, args) {
+                // If there's a new image upload that's base64
+                if (args.employee_photo && args.employee_photo.startsWith('data:image')) {
+                    // Find the employee to get the first name if it's not provided in the update
+                    let employee = null;
+                    if (!args.first_name) {
+                        employee = await Employee.findById(args.id);
+                    }
+                    
+                    // Use the provided first name or get it from the database
+                    const firstName = args.first_name || (employee ? employee.first_name : 'employee');
+                    
+                    // Generate a unique filename
+                    const filename = `${firstName.toLowerCase()}_${Date.now()}.jpg`;
+                    args.employee_photo = saveBase64Image(args.employee_photo, filename);
+                }
+                
                 return await Employee.findByIdAndUpdate(args.id, args, { new: true });
             }
         },
@@ -145,6 +201,19 @@ const Mutation = new GraphQLObjectType({
             type: EmployeeType,
             args: { id: { type: GraphQLNonNull(GraphQLID) } },
             async resolve(parent, args) {
+                const employee = await Employee.findById(args.id);
+                if (employee && employee.employee_photo) {
+                    const photoPath = path.join(uploadsDir, employee.employee_photo);
+                    // Only delete if the file exists and is within our uploads directory
+                    if (fs.existsSync(photoPath) && photoPath.startsWith(uploadsDir)) {
+                        try {
+                            fs.unlinkSync(photoPath);
+                        } catch (err) {
+                            console.error('Error deleting employee photo:', err);
+                        }
+                    }
+                }
+                
                 return await Employee.findByIdAndDelete(args.id);
             }
         }
