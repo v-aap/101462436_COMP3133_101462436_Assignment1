@@ -2,21 +2,23 @@ const express = require('express');
 const { graphqlHTTP } = require('express-graphql');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const schema = require('./schema');
 const path = require('path');
-const fs = require('fs');
+const schema = require('./schema');
 require('dotenv').config();
-
 
 const app = express();
 
 // Middleware
 app.use(cors({
-    origin: '*', // Allow all origins
+    origin: '*', // In production, you should restrict this to your frontend domain
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
-  }));
-app.use(express.json());
+}));
+
+app.use(express.json({ limit: '10mb' }));
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 if (!process.env.MONGO_URI) {
     console.error("Error: MONGO_URI is undefined. Check your .env file.");
@@ -37,33 +39,31 @@ app.use('/graphql', graphqlHTTP({
     graphiql: true // Enable GraphiQL for testing
 }));
 
-//Uploads directory
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)){
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Serve static files from the uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Handle File Uploads
-const saveBase64Image = (base64Data, filename) => {
-    // Extract the actual base64 content
-    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    
-    if (!matches || matches.length !== 3) {
-      return null;
-    }
-    
-    const type = matches[1];
-    const buffer = Buffer.from(matches[2], 'base64');
-    const filePath = path.join(uploadsDir, filename);
-    
-    fs.writeFileSync(filePath, buffer);
-    return filename; // Return just the filename to store in the database
-  };
-
-
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Route to verify server is running
+app.get('/', (req, res) => {
+    res.send('Welcome to the Employee Management API');
+});
+
+// Route to check image uploads directory
+app.get('/uploads-info', (req, res) => {
+    const uploadsDir = path.join(__dirname, '../uploads');
+    try {
+        const files = require('fs').readdirSync(uploadsDir);
+        res.json({ 
+            status: 'success', 
+            directory: uploadsDir,
+            fileCount: files.length,
+            files: files
+        });
+    } catch (err) {
+        res.status(500).json({ 
+            status: 'error', 
+            message: err.message,
+            directory: uploadsDir
+        });
+    }
+});
