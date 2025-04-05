@@ -10,10 +10,11 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: '*', // In production, you should restrict this to your frontend domain
+    origin: '*', // Allow all origins in development (restrict this in production)
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  }));
 
 app.use(express.json({ limit: '10mb' }));
 
