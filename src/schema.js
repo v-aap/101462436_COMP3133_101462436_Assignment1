@@ -103,8 +103,8 @@ const RootQuery = new GraphQLObjectType({
             },
             async resolve(parent, args) {
                 let query = {};
-                if (args.designation) query.designation = args.designation;
-                if (args.department) query.department = args.department;
+                if (args.designation) query.designation = new RegExp(args.designation, 'i');
+                if (args.department) query.department = new RegExp(args.department, 'i');
                 return await Employee.find(query);
             }
         }
