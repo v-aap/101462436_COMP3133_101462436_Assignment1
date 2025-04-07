@@ -9,7 +9,8 @@ const EmployeeSchema = new mongoose.Schema({
     salary: { type: Number, required: true, min: 1000 },
     date_of_joining: { type: Date, required: true },
     department: { type: String, required: true },
-    employee_photo: { type: String }
+    employee_photo: { type: String },
+    date_of_joining: { type: Date, required: true }
 });
 
 module.exports = mongoose.model('Employee', EmployeeSchema);
